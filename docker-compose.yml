@@ -1,0 +1,337 @@
+version: "3.9"
+
+# ==========================================================================
+# TicketFlow — Microservices Ticket Booking Platform
+# ==========================================================================
+# Bring up infra only:            docker compose up -d postgres redis rabbitmq elasticsearch
+# Bring up everything:            docker compose up -d --build
+# Tear down (keep volumes):       docker compose down
+# Tear down + wipe data:          docker compose down -v
+# ==========================================================================
+
+networks:
+  ticketflow-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  elasticsearch-data:
+
+services:
+  # ------------------------------------------------------------------------
+  # Infrastructure
+  # ------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticketflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ticketflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-ticketflow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ticketflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ticketflow-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: ticketflow-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ticketflow-net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ticketflow-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ticketflow_pw}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/ticketflow}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ticketflow-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.3
+    container_name: ticketflow-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ticketflow-net
+
+  # ------------------------------------------------------------------------
+  # Backend microservices (built in later phases — commented until Dockerfiles exist)
+  # ------------------------------------------------------------------------
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: ticketflow-auth-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ticketflow}
+      DB_SCHEMA: auth
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
+    ports:
+      - "${AUTH_SERVICE_PORT:-8081}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
+
+  venue-event-service:
+    build:
+      context: ./services/venue-event-service
+      dockerfile: Dockerfile
+    container_name: ticketflow-venue-event-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ticketflow}
+      DB_SCHEMA: venue_event
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: 9200
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: http://auth-service:8081
+    ports:
+      - "${VENUE_EVENT_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
+
+  seat-hold-service:
+    build:
+      context: ./services/seat-hold-service
+      dockerfile: Dockerfile
+    container_name: ticketflow-seat-hold-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ticketflow}
+      DB_SCHEMA: seat_hold
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SEAT_HOLD_TTL_SECONDS: ${SEAT_HOLD_TTL_SECONDS:-600}
+      JWT_SECRET: ${JWT_SECRET}
+      VENUE_EVENT_SERVICE_URL: http://venue-event-service:8082
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_pw}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/ticketflow}
+    ports:
+      - "${SEAT_HOLD_SERVICE_PORT:-8083}:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
+
+  booking-service:
+    build:
+      context: ./services/booking-service
+      dockerfile: Dockerfile
+    container_name: ticketflow-booking-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ticketflow}
+      DB_SCHEMA: booking
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      SEAT_HOLD_SERVICE_URL: http://seat-hold-service:8083
+      VENUE_EVENT_SERVICE_URL: http://venue-event-service:8082
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_pw}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/ticketflow}
+    ports:
+      - "${BOOKING_SERVICE_PORT:-8084}:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
+
+  waitlist-service:
+    build:
+      context: ./services/waitlist-service
+      dockerfile: Dockerfile
+    container_name: ticketflow-waitlist-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ticketflow}
+      DB_SCHEMA: waitlist
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
+      WAITLIST_OFFER_TTL_SECONDS: ${WAITLIST_OFFER_TTL_SECONDS:-900}
+      JWT_SECRET: ${JWT_SECRET}
+      SEAT_HOLD_SERVICE_URL: http://seat-hold-service:8083
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_pw}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/ticketflow}
+    ports:
+      - "${WAITLIST_SERVICE_PORT:-8085}:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: ticketflow-notification-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_pw}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/ticketflow}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8086}:8086"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
+
+  # ------------------------------------------------------------------------
+  # Frontend
+  # ------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost/api}
+        VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-ws://localhost/ws}
+    container_name: ticketflow-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
+
+  # ------------------------------------------------------------------------
+  # Nginx API Gateway / Load Balancer
+  # ------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ticketflow-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - auth-service
+      - venue-event-service
+      - seat-hold-service
+      - booking-service
+      - waitlist-service
+      - notification-service
+      - frontend
+    networks:
+      - ticketflow-net
+    profiles: ["services"]
