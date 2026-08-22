@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Booking cancelled</title></head>
+<body style="margin:0;padding:0;background:#0f1115;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f1115;padding:24px 0;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="background:#191d24;border-radius:14px;overflow:hidden;">
+
+      <tr><td style="background:#2a2f39;padding:22px 28px;">
+        <div style="color:#fff;font-size:20px;font-weight:700;">TicketFlow</div>
+        <div style="color:#9aa4b2;font-size:13px;margin-top:2px;">Booking cancelled</div>
+      </td></tr>
+
+      <tr><td style="padding:28px;">
+        <p style="color:#e8eaed;font-size:15px;margin:0 0 18px;">
+          Hi <span th:text="${customerName}">there</span>, your booking
+          <strong style="color:#fff;" th:text="${bookingReference}">TF-XXXX</strong> has been cancelled.
+        </p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#12151b;border-radius:10px;padding:18px;">
+          <tr><td>
+            <div style="color:#fff;font-size:18px;font-weight:600;" th:text="${eventTitle}">Event</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:6px;" th:text="${venueName}">Venue</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:2px;" th:text="${showTime}">Time</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:10px;">
+              Released seats:
+              <span th:each="seat, i : ${seats}">
+                <span style="color:#e8eaed;font-weight:600;" th:text="${seat.seatLabel}">A1</span><span th:if="${!i.last}">, </span>
+              </span>
+            </div>
+          </td></tr>
+        </table>
+
+        <p style="color:#c3cad4;font-size:14px;margin-top:20px;">
+          Refund amount: <strong style="color:#fff;" th:text="'₹' + ${refundAmount}">₹0</strong>
+        </p>
+
+        <p style="color:#6f7885;font-size:12px;margin-top:22px;line-height:1.6;">
+          These seats have been returned to the pool and offered to the next customers on the waitlist.
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

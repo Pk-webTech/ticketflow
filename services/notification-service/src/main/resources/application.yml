@@ -1,0 +1,77 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: notification-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ticketflow}?currentSchema=${DB_SCHEMA:notification}
+    username: ${DB_USER:ticketflow}
+    password: ${DB_PASSWORD:ticketflow_pw}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ${DB_SCHEMA:notification}
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    schemas: ${DB_SCHEMA:notification}
+    default-schema: ${DB_SCHEMA:notification}
+    baseline-on-migrate: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:ticketflow}
+    password: ${RABBITMQ_PASSWORD:ticketflow_pw}
+    virtual-host: ${RABBITMQ_VHOST:/ticketflow}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 3000
+          multiplier: 2
+          max-attempts: 4
+        default-requeue-rejected: false
+
+  # Gmail free tier by default; any SMTP provider (Brevo, Mailtrap, SendGrid) works
+  # by swapping these four values — no code change.
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  thymeleaf:
+    cache: false
+
+notification:
+  from-address: ${MAIL_FROM_ADDRESS:noreply@ticketflow.local}
+  from-name: ${MAIL_FROM_NAME:TicketFlow}
+  # When false, emails are rendered and logged but never sent — lets the whole
+  # pipeline be demonstrated without SMTP credentials configured.
+  delivery-enabled: ${MAIL_DELIVERY_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.ticketflow.notification: INFO

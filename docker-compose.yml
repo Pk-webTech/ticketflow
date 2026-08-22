@@ -249,6 +249,9 @@ services:
       DB_USER: ${POSTGRES_USER:-ticketflow}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
       WAITLIST_OFFER_TTL_SECONDS: ${WAITLIST_OFFER_TTL_SECONDS:-900}
+      WAITLIST_SWEEP_INTERVAL_MS: ${WAITLIST_SWEEP_INTERVAL_MS:-30000}
+      # Baked into emailed claim links — must be externally reachable.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
       JWT_SECRET: ${JWT_SECRET}
       SEAT_HOLD_SERVICE_URL: http://seat-hold-service:8083
       RABBITMQ_HOST: rabbitmq
@@ -275,19 +278,29 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ticketflow}
+      DB_SCHEMA: notification
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_pw}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_pw}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/ticketflow}
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 587
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TicketFlow}
+      MAIL_DELIVERY_ENABLED: ${MAIL_DELIVERY_ENABLED:-true}
     ports:
       - "${NOTIFICATION_SERVICE_PORT:-8086}:8086"
     depends_on:
+      postgres:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     networks:

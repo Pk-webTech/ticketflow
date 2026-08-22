@@ -1,6 +1,6 @@
-package com.ticketflow.seathold.config;
+package com.ticketflow.booking.config;
 
-import com.ticketflow.seathold.security.JwtAuthenticationFilter;
+import com.ticketflow.booking.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -33,13 +33,9 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                        .requestMatchers("/ws/**").permitAll() // STOMP handshake; per-message auth not enforced in this phase
-                        // Seat map is publicly viewable (shows AVAILABLE/HELD_BY_OTHERS/BOOKED to anonymous users;
-                        // HELD_BY_ME only resolves when a valid JWT is present).
-                        .requestMatchers(HttpMethod.GET, "/api/seats/shows/**").permitAll()
-                        // Placing/releasing a hold requires an authenticated CUSTOMER.
-                        .requestMatchers(HttpMethod.POST, "/api/seats/shows/**").hasRole("CUSTOMER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/seats/shows/**").hasRole("CUSTOMER")
+                        // Read-only: seat-hold-service merges this into the public seat map.
+                        .requestMatchers(HttpMethod.GET, "/api/bookings/shows/*/booked-seats").permitAll()
+                        .requestMatchers("/api/bookings/summary/**").hasAnyRole("ORGANISER", "ADMIN")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>A seat opened up</title></head>
+<body style="margin:0;padding:0;background:#0f1115;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f1115;padding:24px 0;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="background:#191d24;border-radius:14px;overflow:hidden;">
+
+      <tr><td style="background:#1f9d55;padding:22px 28px;">
+        <div style="color:#fff;font-size:20px;font-weight:700;">TicketFlow</div>
+        <div style="color:#d6f5e3;font-size:13px;margin-top:2px;">A seat just opened up</div>
+      </td></tr>
+
+      <tr><td style="padding:28px;">
+        <p style="color:#e8eaed;font-size:15px;margin:0 0 18px;">
+          Hi <span th:text="${customerName}">there</span> — you're next in line, and a
+          <strong style="color:#fff;" th:text="${categoryName}">Premium</strong> seat is now available.
+        </p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#12151b;border-radius:10px;padding:18px;">
+          <tr><td>
+            <div style="color:#fff;font-size:18px;font-weight:600;" th:text="${eventTitle}">Event</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:6px;" th:text="${venueName}">Venue</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:2px;" th:text="${showTime}">Time</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:10px;" th:if="${!seatLabels.isEmpty()}">
+              Seats held for you:
+              <span th:each="label, i : ${seatLabels}">
+                <span style="color:#e8eaed;font-weight:600;" th:text="${label}">A1</span><span th:if="${!i.last}">, </span>
+              </span>
+            </div>
+          </td></tr>
+        </table>
+
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="margin-top:22px;background:#3a2a12;border:1px solid #6b4a15;border-radius:10px;">
+          <tr><td style="padding:14px 16px;color:#f5c65c;font-size:14px;">
+            ⏳ This offer expires in <strong th:text="${minutes}">15</strong> minutes
+            (<span th:text="${expiresAt}">time</span>). After that the seats go to the next customer in the queue.
+          </td></tr>
+        </table>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+          <tr><td align="center">
+            <a th:href="${claimUrl}" th:text="'Claim these seats'"
+               style="display:inline-block;background:#1f9d55;color:#fff;text-decoration:none;
+                      font-size:16px;font-weight:600;padding:14px 34px;border-radius:9px;">Claim these seats</a>
+          </td></tr>
+        </table>
+
+        <p style="color:#6f7885;font-size:12px;margin-top:24px;line-height:1.6;">
+          This link is unique to you and can only be used once. If you no longer want these seats,
+          simply ignore this email and they'll be offered to someone else.
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

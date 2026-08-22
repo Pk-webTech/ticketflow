@@ -1,6 +1,6 @@
-package com.ticketflow.seathold.config;
+package com.ticketflow.waitlist.config;
 
-import com.ticketflow.seathold.security.JwtAuthenticationFilter;
+import com.ticketflow.waitlist.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -33,17 +33,13 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                        .requestMatchers("/ws/**").permitAll() // STOMP handshake; per-message auth not enforced in this phase
-                        // Seat map is publicly viewable (shows AVAILABLE/HELD_BY_OTHERS/BOOKED to anonymous users;
-                        // HELD_BY_ME only resolves when a valid JWT is present).
-                        .requestMatchers(HttpMethod.GET, "/api/seats/shows/**").permitAll()
-                        // Placing/releasing a hold requires an authenticated CUSTOMER.
-                        .requestMatchers(HttpMethod.POST, "/api/seats/shows/**").hasRole("CUSTOMER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/seats/shows/**").hasRole("CUSTOMER")
+                        // The emailed claim link must open without a session: the
+                        // single-use token in the URL IS the authorisation, so a
+                        // customer clicking from their inbox is never bounced to login.
+                        .requestMatchers(HttpMethod.GET, "/api/waitlist/offers/token/*").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
@@ -54,7 +50,6 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

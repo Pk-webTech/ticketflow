@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Your TicketFlow tickets</title></head>
+<body style="margin:0;padding:0;background:#0f1115;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f1115;padding:24px 0;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="background:#191d24;border-radius:14px;overflow:hidden;">
+
+      <tr><td style="background:#e0483c;padding:22px 28px;">
+        <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.3px;">TicketFlow</div>
+        <div style="color:#ffd9d5;font-size:13px;margin-top:2px;">Your booking is confirmed</div>
+      </td></tr>
+
+      <tr><td style="padding:28px;">
+        <p style="color:#e8eaed;font-size:15px;margin:0 0 18px;">
+          Hi <span th:text="${customerName}">there</span>, you're all set.
+        </p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#12151b;border-radius:10px;padding:18px;">
+          <tr><td>
+            <div style="color:#fff;font-size:19px;font-weight:600;" th:text="${eventTitle}">Event</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:6px;" th:text="${venueName}">Venue</div>
+            <div style="color:#9aa4b2;font-size:14px;margin-top:2px;" th:text="${showTime}">Time</div>
+          </td></tr>
+        </table>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;">
+          <tr>
+            <td style="color:#9aa4b2;font-size:12px;text-transform:uppercase;letter-spacing:.6px;padding-bottom:8px;">Seat</td>
+            <td style="color:#9aa4b2;font-size:12px;text-transform:uppercase;letter-spacing:.6px;padding-bottom:8px;">Category</td>
+            <td align="right" style="color:#9aa4b2;font-size:12px;text-transform:uppercase;letter-spacing:.6px;padding-bottom:8px;">Price</td>
+          </tr>
+          <tr th:each="seat : ${seats}">
+            <td style="color:#e8eaed;font-size:15px;font-weight:600;padding:6px 0;" th:text="${seat.seatLabel}">A1</td>
+            <td style="color:#c3cad4;font-size:14px;padding:6px 0;" th:text="${seat.categoryName}">Premium</td>
+            <td align="right" style="color:#e8eaed;font-size:14px;padding:6px 0;" th:text="'₹' + ${seat.price}">₹0</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="border-top:1px solid #2a2f39;padding-top:12px;color:#fff;font-size:15px;font-weight:600;">Total</td>
+            <td align="right" style="border-top:1px solid #2a2f39;padding-top:12px;color:#fff;font-size:16px;font-weight:700;"
+                th:text="'₹' + ${totalAmount}">₹0</td>
+          </tr>
+        </table>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;background:#fff;border-radius:10px;">
+          <tr><td align="center" style="padding:20px;">
+            <!-- CID inline attachment: data: URIs are stripped by Gmail/Outlook -->
+            <img src="cid:qrcode" alt="Ticket QR code" width="220" height="220" style="display:block;"/>
+            <div style="color:#5b636e;font-size:12px;margin-top:10px;">Show this at the gate</div>
+            <div style="color:#0f1115;font-size:18px;font-weight:700;letter-spacing:1px;margin-top:4px;"
+                 th:text="${bookingReference}">TF-XXXXXXXX</div>
+          </td></tr>
+        </table>
+
+        <p style="color:#6f7885;font-size:12px;margin-top:24px;line-height:1.6;">
+          Need to cancel? You can do it from your booking history up until the show starts.
+          Cancelled seats are automatically offered to customers on the waitlist.
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
