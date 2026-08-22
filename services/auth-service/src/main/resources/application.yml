@@ -1,0 +1,50 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ticketflow}?currentSchema=${DB_SCHEMA:auth}
+    username: ${DB_USER:ticketflow}
+    password: ${DB_PASSWORD:ticketflow_pw}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns schema changes; Hibernate only validates
+    properties:
+      hibernate:
+        default_schema: ${DB_SCHEMA:auth}
+        format_sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    schemas: ${DB_SCHEMA:auth}
+    default-schema: ${DB_SCHEMA:auth}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-please-32bytes-min}
+    access-expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.ticketflow.auth: INFO
+    org.springframework.security: WARN

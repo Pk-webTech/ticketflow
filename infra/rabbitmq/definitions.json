@@ -1,0 +1,77 @@
+{
+  "rabbit_version": "3.13.0",
+  "vhosts": [
+    { "name": "/ticketflow" }
+  ],
+  "permissions": [
+    {
+      "user": "ticketflow",
+      "vhost": "/ticketflow",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    { "name": "booking.events", "vhost": "/ticketflow", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "waitlist.events", "vhost": "/ticketflow", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "notification.events", "vhost": "/ticketflow", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "dlx.ticketflow", "vhost": "/ticketflow", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {} }
+  ],
+  "queues": [
+    {
+      "name": "notification.booking-confirmed.q",
+      "vhost": "/ticketflow",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "dlx.ticketflow", "x-dead-letter-routing-key": "notification.booking-confirmed.dlq" }
+    },
+    {
+      "name": "notification.booking-cancelled.q",
+      "vhost": "/ticketflow",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "dlx.ticketflow", "x-dead-letter-routing-key": "notification.booking-cancelled.dlq" }
+    },
+    {
+      "name": "waitlist.booking-cancelled.q",
+      "vhost": "/ticketflow",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "dlx.ticketflow", "x-dead-letter-routing-key": "waitlist.booking-cancelled.dlq" }
+    },
+    {
+      "name": "notification.waitlist-offer.q",
+      "vhost": "/ticketflow",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "dlx.ticketflow", "x-dead-letter-routing-key": "notification.waitlist-offer.dlq" }
+    },
+    {
+      "name": "seathold.waitlist-offer-accepted.q",
+      "vhost": "/ticketflow",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "dlx.ticketflow", "x-dead-letter-routing-key": "seathold.waitlist-offer-accepted.dlq" }
+    },
+    { "name": "notification.booking-confirmed.dlq", "vhost": "/ticketflow", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "notification.booking-cancelled.dlq", "vhost": "/ticketflow", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "waitlist.booking-cancelled.dlq", "vhost": "/ticketflow", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "notification.waitlist-offer.dlq", "vhost": "/ticketflow", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "seathold.waitlist-offer-accepted.dlq", "vhost": "/ticketflow", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "bindings": [
+    { "source": "booking.events", "vhost": "/ticketflow", "destination": "notification.booking-confirmed.q", "destination_type": "queue", "routing_key": "booking.confirmed", "arguments": {} },
+    { "source": "booking.events", "vhost": "/ticketflow", "destination": "notification.booking-cancelled.q", "destination_type": "queue", "routing_key": "booking.cancelled", "arguments": {} },
+    { "source": "booking.events", "vhost": "/ticketflow", "destination": "waitlist.booking-cancelled.q", "destination_type": "queue", "routing_key": "booking.cancelled", "arguments": {} },
+
+    { "source": "waitlist.events", "vhost": "/ticketflow", "destination": "notification.waitlist-offer.q", "destination_type": "queue", "routing_key": "waitlist.offer.created", "arguments": {} },
+    { "source": "waitlist.events", "vhost": "/ticketflow", "destination": "seathold.waitlist-offer-accepted.q", "destination_type": "queue", "routing_key": "waitlist.offer.accepted", "arguments": {} },
+
+    { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "notification.booking-confirmed.dlq", "destination_type": "queue", "routing_key": "notification.booking-confirmed.dlq", "arguments": {} },
+    { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "notification.booking-cancelled.dlq", "destination_type": "queue", "routing_key": "notification.booking-cancelled.dlq", "arguments": {} },
+    { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "waitlist.booking-cancelled.dlq", "destination_type": "queue", "routing_key": "waitlist.booking-cancelled.dlq", "arguments": {} },
+    { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "notification.waitlist-offer.dlq", "destination_type": "queue", "routing_key": "notification.waitlist-offer.dlq", "arguments": {} },
+    { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "seathold.waitlist-offer-accepted.dlq", "destination_type": "queue", "routing_key": "seathold.waitlist-offer-accepted.dlq", "arguments": {} }
+  ]
+}

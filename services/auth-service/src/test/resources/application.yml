@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:authtest;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        default_schema: PUBLIC
+
+  flyway:
+    enabled: false
+
+security:
+  jwt:
+    secret: test-secret-key-at-least-32-bytes-long-for-hs256
+    access-expiration-ms: 3600000
+    refresh-expiration-ms: 604800000

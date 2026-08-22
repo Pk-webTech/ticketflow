@@ -3,6 +3,11 @@
 Microservices-based ticket booking system with real-time seat maps, TTL-based
 seat holds, waitlist auto-assignment, and QR-code email tickets.
 
+> 🚧 **Status: Phase 1 (Infrastructure) complete.** Service implementations
+> land in subsequent phases. This README is a placeholder and will be
+> replaced with the full setup guide, API docs, DB schema, and seat-hold /
+> waitlist logic explanation in the final phase.
+
 ## Stack
 
 | Layer | Technology |
