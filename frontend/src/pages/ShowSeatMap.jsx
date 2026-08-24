@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SeatMap from '../components/SeatMap.jsx';
-import { Seats, Bookings, Events, Waitlist, auth, ApiError } from '../lib/api.js';
+import { Seats, Bookings, Events, Venues, Waitlist, auth, ApiError } from '../lib/api.js';
 import { subscribeSeatMap } from '../lib/seatSocket.js';
 import { money, mmss, dateTime } from '../lib/format.js';
 
@@ -29,16 +29,24 @@ export default function ShowSeatMap() {
   const navigate = useNavigate();
 
   const [show, setShow] = useState(null);
+  const [event, setEvent] = useState(null);
+  const [venue, setVenue] = useState(null);
   const [seats, setSeats] = useState([]);
   const [selected, setSelected] = useState([]);
   const [hold, setHold] = useState(null);
   const [remaining, setRemaining] = useState(0);
+  const [ttl, setTtl] = useState(600);
+  const [changed, setChanged] = useState(new Set());
+  const [socket, setSocket] = useState('connecting');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const holdRef = useRef(null);
   holdRef.current = hold;
+  const selectedRef = useRef([]);
+  selectedRef.current = selected;
 
   // ---- initial load ------------------------------------------------
   useEffect(() => {
@@ -58,8 +66,15 @@ export default function ShowSeatMap() {
         setSeats((mapData.seats ?? []).map((s) =>
           bookedSet.has(s.seatId) ? { ...s, status: 'BOOKED' } : s));
         setShow(showData);
+
+        // ShowResponse carries no title or venue name, so fetch them separately
+        // and treat both as best-effort decoration.
+        if (showData?.eventId) Events.get(showData.eventId).then(setEvent).catch(() => {});
+        if (showData?.venueId) Venues.get(showData.venueId).then(setVenue).catch(() => {});
       } catch (err) {
         if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -69,53 +84,74 @@ export default function ShowSeatMap() {
   useEffect(() => {
     const disconnect = subscribeSeatMap(showId, (event) => {
       const affected = new Set(event.seatIds ?? []);
-      setSeats((prev) => prev.map((seat) => {
-        if (!affected.has(seat.seatId)) return seat;
-        // Our own hold shouldn't grey itself out under us.
-        if (holdRef.current && holdRef.current.holdId === event.holdId) return seat;
-        return { ...seat, status: event.status };
+      if (affected.size === 0) return;
+
+      setSeats((prev) => prev.map((s) => {
+        if (!affected.has(s.seatId)) return s;
+        // Our own hold is echoed back to us as HELD; don't let the broadcast
+        // downgrade a seat we are actively holding.
+        const mine = holdRef.current && event.holdId === holdRef.current.holdId;
+        if (event.status === 'HELD') {
+          return { ...s, status: mine ? 'HELD_BY_ME' : 'HELD_BY_OTHERS' };
+        }
+        if (event.status === 'BOOKED') return { ...s, status: 'BOOKED' };
+        return { ...s, status: 'AVAILABLE' };
       }));
-    });
+
+      // Drop anything we had selected that someone else just won.
+      if (event.status !== 'AVAILABLE' && !(holdRef.current && event.holdId === holdRef.current.holdId)) {
+        setSelected((prev) => prev.filter((id) => !affected.has(id)));
+      }
+
+      setChanged(affected);
+      setTimeout(() => setChanged(new Set()), 600);
+    }, setSocket);
+
     return disconnect;
   }, [showId]);
 
   // ---- hold countdown ----------------------------------------------
   useEffect(() => {
-    if (!hold) return;
-    const deadline = new Date(hold.expiresAt).getTime();
-    const tick = () => {
-      const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
-      setRemaining(left);
-      if (left === 0) {
-        setHold(null);
-        setSelected([]);
-        setNotice('Your seat hold expired and the seats were released automatically.');
-      }
-    };
+    if (!hold) { setRemaining(0); return undefined; }
+    setTtl(hold.ttlSeconds || 600);
+    const expiry = new Date(hold.expiresAt).getTime();
+    const tick = () => setRemaining(Math.max(0, Math.round((expiry - Date.now()) / 1000)));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [hold]);
 
-  // ---- release on leaving the page ---------------------------------
+  useEffect(() => {
+    if (hold && remaining === 0) {
+      setHold(null);
+      setSelected([]);
+      setError('Your hold expired and the seats went back on sale. Pick them again if they are still free.');
+    }
+  }, [remaining, hold]);
+
+  // ---- courtesy release on unmount ---------------------------------
   useEffect(() => () => {
     const h = holdRef.current;
-    if (h) Seats.release(h.showId, h.holdId, h.seatIds).catch(() => {});
-  }, []);
+    if (h) Seats.release(showId, h.holdId, selectedRef.current).catch(() => {});
+  }, [showId]);
+
+  // ---- derived ------------------------------------------------------
+  const selectedSeats = useMemo(
+    () => seats.filter((s) => selected.includes(s.seatId)),
+    [seats, selected],
+  );
+  const total = useMemo(
+    () => selectedSeats.reduce((sum, s) => sum + Number(s.price ?? 0), 0),
+    [selectedSeats],
+  );
+  const soldOut = seats.length > 0 && seats.every((s) => s.status === 'BOOKED');
 
   const toggleSeat = (seat) => {
-    if (hold) return;   // selection is frozen once seats are held
-    setSelected((prev) =>
-      prev.includes(seat.seatId) ? prev.filter((id) => id !== seat.seatId) : [...prev, seat.seatId]);
+    if (hold) return;   // the hold is fixed once placed; release to change it
+    setSelected((prev) => prev.includes(seat.seatId)
+      ? prev.filter((id) => id !== seat.seatId)
+      : [...prev, seat.seatId]);
   };
-
-  const selectedSeats = useMemo(
-    () => seats.filter((s) => selected.includes(s.seatId)), [seats, selected]);
-
-  const total = useMemo(
-    () => selectedSeats.reduce((sum, s) => sum + Number(s.price ?? 0), 0), [selectedSeats]);
-
-  const soldOut = seats.length > 0 && seats.every((s) => s.status === 'BOOKED');
 
   // ---- actions ------------------------------------------------------
   const placeHold = async () => {
@@ -177,17 +213,31 @@ export default function ShowSeatMap() {
     return [...map.entries()];
   }, [seats]);
 
+  const urgent = hold && remaining <= 60;
+
   return (
     <div>
-      <h2 style={{ marginBottom: 4 }}>Select your seats</h2>
-      <p className="muted">{dateTime(show?.showDateTime)}</p>
+      <div className="panel-head" style={{ marginTop: 8 }}>
+        <div>
+          <div className="eyebrow">Choose your seats</div>
+          <h2>{event?.title || 'This show'}</h2>
+          <p className="muted" style={{ marginTop: 6 }}>
+            {[venue ? `${venue.name}${venue.city ? `, ${venue.city}` : ''}` : null, dateTime(show?.showDateTime)]
+              .filter(Boolean).join(' · ')}
+          </p>
+        </div>
+        <span className={`live-pill ${socket === 'live' ? '' : 'off'}`}>
+          <span className="live-dot" />
+          {socket === 'live' ? 'Live' : socket === 'reconnecting' ? 'Reconnecting' : 'Connecting'}
+        </span>
+      </div>
 
       {error && <div className="error">{error}</div>}
       {notice && <div className="notice">{notice}</div>}
 
       {soldOut && (
         <div className="card" style={{ marginTop: 16 }}>
-          <strong>This show is sold out.</strong>
+          <strong>Every seat is sold.</strong>
           <p className="muted" style={{ marginTop: 6 }}>
             Join a waitlist and you'll be emailed a time-limited claim link if someone cancels.
           </p>
@@ -201,29 +251,52 @@ export default function ShowSeatMap() {
         </div>
       )}
 
-      <SeatMap seats={seats} selected={selected} onToggle={toggleSeat} disabled={busy || !!hold} />
+      {loading
+        ? <div className="skeleton" style={{ height: 320, marginTop: 26 }} />
+        : (
+          <SeatMap
+            seats={seats}
+            selected={selected}
+            onToggle={toggleSeat}
+            disabled={busy || !!hold}
+            changed={changed}
+          />
+        )}
 
       {selected.length > 0 && (
-        <div className="checkout-bar">
+        <div className="dock">
           <div>
-            <div style={{ fontWeight: 600 }}>
-              {selectedSeats.map((s) => `${s.rowLabel}${s.seatNumber}`).join(', ')}
+            <div className="faint">
+              {selected.length} seat{selected.length > 1 ? 's' : ''} ·{' '}
+              {selectedSeats.map((s) => s.seatLabel || `${s.rowLabel}${s.seatNumber}`).join(', ')}
             </div>
-            <div className="muted">{selected.length} seat(s) · {money(total)}</div>
+            <div className="total">{money(total)}</div>
           </div>
 
-          <span style={{ marginLeft: 'auto' }} />
+          <div className="spacer" />
+
+          {hold && (
+            <div className={`timer ${urgent ? 'urgent' : ''}`}>
+              <div className="timer-ring" style={{ '--p': Math.max(0, (remaining / ttl) * 100) }}>
+                <span>{mmss(remaining)}</span>
+              </div>
+              <div className="faint" style={{ maxWidth: 150 }}>
+                Seats held for you. Check out before the timer runs out.
+              </div>
+            </div>
+          )}
 
           {hold ? (
             <>
-              <span className="timer">⏳ {mmss(remaining)}</span>
               <button className="ghost" onClick={releaseHold} disabled={busy}>Release</button>
-              <button className="ok" onClick={confirmBooking} disabled={busy}>
-                Pay {money(total)} & confirm
+              <button onClick={confirmBooking} disabled={busy}>
+                {busy ? 'Confirming…' : `Pay ${money(total)}`}
               </button>
             </>
           ) : (
-            <button onClick={placeHold} disabled={busy}>Hold these seats</button>
+            <button onClick={placeHold} disabled={busy}>
+              {busy ? 'Holding…' : 'Hold these seats'}
+            </button>
           )}
         </div>
       )}

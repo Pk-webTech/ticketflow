@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Bookings } from '../lib/api.js';
 import { money, dateTime } from '../lib/format.js';
 
+/** Bookings render as physical ticket stubs — perforation, tear-off and all. */
 export default function MyBookings() {
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busyId, setBusyId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
 
   const load = async () => {
@@ -16,6 +18,8 @@ export default function MyBookings() {
       setBookings(page?.content ?? page ?? []);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,7 +35,7 @@ export default function MyBookings() {
     setBusyId(id); setError('');
     try {
       await Bookings.cancel(id);
-      setNotice('Booking cancelled. If anyone is waitlisted for these seats, they have been emailed an offer.');
+      setNotice('Booking cancelled. Anyone waitlisted for these seats has been emailed an offer.');
       await load();
     } catch (err) {
       setError(err.message);
@@ -42,44 +46,66 @@ export default function MyBookings() {
 
   return (
     <div>
+      <div className="eyebrow">Your tickets</div>
       <h2>My bookings</h2>
+
       {notice && <div className="notice">{notice}</div>}
       {error && <div className="error">{error}</div>}
-      {bookings.length === 0 && <p className="muted">You haven't booked anything yet.</p>}
 
-      <div className="grid" style={{ marginTop: 16 }}>
-        {bookings.map((b) => (
-          <div className="card" key={b.id}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 17, fontWeight: 600 }}>{b.eventTitle}</div>
-              <span className={`badge ${b.status === 'CONFIRMED' ? 'confirmed' : 'cancelled'}`}>
-                {b.status}
-              </span>
-              <span style={{ marginLeft: 'auto', fontFamily: 'monospace', color: 'var(--muted)' }}>
-                {b.bookingReference}
-              </span>
+      {loading && <div className="skeleton" style={{ height: 140, marginTop: 20 }} />}
+
+      {!loading && bookings.length === 0 && (
+        <div className="empty" style={{ marginTop: 20 }}>
+          <h3>No tickets yet</h3>
+          <p>Find a show and hold a seat — it takes about thirty seconds.</p>
+          <Link className="btn" to="/" style={{ display: 'inline-block', marginTop: 16 }}>Browse shows</Link>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
+        {bookings.map((b, i) => (
+          <article
+            className={`stub rise ${b.status === 'CANCELLED' ? 'is-cancelled' : ''}`}
+            key={b.id}
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            <div className="stub-main">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <h3>{b.eventTitle || 'Show'}</h3>
+                <span className={`badge ${b.status === 'CONFIRMED' ? 'confirmed' : 'cancelled'}`}>
+                  {b.status}
+                </span>
+              </div>
+
+              <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>
+                {[b.venueName, dateTime(b.showStartsAt || b.showDateTime)].filter(Boolean).join(' · ')}
+              </div>
+
+              <div className="stub-seats">
+                {(b.seats ?? []).map((s) => (
+                  <span className="seat-tag" key={s.seatId || s.seatLabel}>
+                    {s.seatLabel || `${s.rowLabel ?? ''}${s.seatNumber ?? ''}`}
+                  </span>
+                ))}
+              </div>
+
+              {b.status === 'CONFIRMED' && (
+                <button className="danger tiny" style={{ marginTop: 16 }}
+                  disabled={busyId === b.id} onClick={() => cancel(b.id)}>
+                  {busyId === b.id ? 'Cancelling…' : 'Cancel booking'}
+                </button>
+              )}
             </div>
 
-            <div className="muted" style={{ marginTop: 6 }}>
-              {b.venueName} · {dateTime(b.showStartsAt)}
+            <div className="stub-tear">
+              <span className="faint" style={{ letterSpacing: '0.2em', fontSize: 10 }}>REF</span>
+              <span className="stub-ref">{b.bookingReference}</span>
+              <strong style={{ fontFamily: 'var(--font-display)', fontSize: 18 }}>
+                {money(b.totalAmount)}
+              </strong>
+              <span className="faint">QR sent by email</span>
             </div>
-
-            <div style={{ marginTop: 12, fontSize: 14 }}>
-              Seats: <strong>{b.seats?.map((s) => s.seatLabel).join(', ')}</strong>
-              <span className="muted"> · {money(b.totalAmount)}</span>
-            </div>
-
-            {b.status === 'CONFIRMED' && (
-              <button
-                className="ghost"
-                style={{ marginTop: 14 }}
-                disabled={busyId === b.id}
-                onClick={() => cancel(b.id)}
-              >
-                {busyId === b.id ? 'Cancelling…' : 'Cancel booking'}
-              </button>
-            )}
-          </div>
+          </article>
         ))}
       </div>
     </div>

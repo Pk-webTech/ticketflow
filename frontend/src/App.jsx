@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import NavBar from './components/NavBar.jsx';
+import ProjectorDust from './components/ProjectorDust.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import EventList from './pages/EventList.jsx';
@@ -22,6 +23,7 @@ function Protected({ children, roles = [] }) {
 export default function App() {
   return (
     <>
+      <ProjectorDust />
       <NavBar />
       <div className="container">
         <Routes>

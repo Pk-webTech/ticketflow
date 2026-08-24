@@ -1,9 +1,9 @@
 /**
- * Thin fetch wrapper.
+ * Thin fetch wrapper. UNCHANGED CONTRACT — every path here matches the
+ * backend exactly as it is today. Do not "tidy" these paths.
  *
  * Everything goes through the Nginx gateway on a single origin, so the client
- * never needs per-service hostnames — that routing lives in nginx.conf and can
- * change (scale out, move a service) without touching the frontend.
+ * never needs per-service hostnames.
  */
 const TOKEN_KEY = 'tf_access_token';
 const USER_KEY = 'tf_user';
@@ -22,10 +22,12 @@ export const auth = {
   save(token, user) {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    window.dispatchEvent(new Event('tf-auth'));
   },
   clear() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    window.dispatchEvent(new Event('tf-auth'));
   },
 };
 
