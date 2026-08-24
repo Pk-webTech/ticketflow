@@ -1,13 +1,5 @@
 {
   "rabbit_version": "3.13.0",
-  "users": [
-    {
-      "name": "ticketflow",
-      "password_hash": "GNX/GPV+wt0/BBoZXyfbHSJsYyOj02nD0UCm8etxOyf9nbqd",
-      "hashing_algorithm": "rabbit_password_hashing_sha256",
-      "tags": ["administrator"]
-    }
-  ],
   "vhosts": [
     { "name": "/ticketflow" }
   ],
@@ -72,8 +64,10 @@
     { "source": "booking.events", "vhost": "/ticketflow", "destination": "notification.booking-confirmed.q", "destination_type": "queue", "routing_key": "booking.confirmed", "arguments": {} },
     { "source": "booking.events", "vhost": "/ticketflow", "destination": "notification.booking-cancelled.q", "destination_type": "queue", "routing_key": "booking.cancelled", "arguments": {} },
     { "source": "booking.events", "vhost": "/ticketflow", "destination": "waitlist.booking-cancelled.q", "destination_type": "queue", "routing_key": "booking.cancelled", "arguments": {} },
+
     { "source": "waitlist.events", "vhost": "/ticketflow", "destination": "notification.waitlist-offer.q", "destination_type": "queue", "routing_key": "waitlist.offer.created", "arguments": {} },
     { "source": "waitlist.events", "vhost": "/ticketflow", "destination": "seathold.waitlist-offer-accepted.q", "destination_type": "queue", "routing_key": "waitlist.offer.accepted", "arguments": {} },
+
     { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "notification.booking-confirmed.dlq", "destination_type": "queue", "routing_key": "notification.booking-confirmed.dlq", "arguments": {} },
     { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "notification.booking-cancelled.dlq", "destination_type": "queue", "routing_key": "notification.booking-cancelled.dlq", "arguments": {} },
     { "source": "dlx.ticketflow", "vhost": "/ticketflow", "destination": "waitlist.booking-cancelled.dlq", "destination_type": "queue", "routing_key": "waitlist.booking-cancelled.dlq", "arguments": {} },

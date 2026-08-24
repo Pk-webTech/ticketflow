@@ -1,8 +1,14 @@
 -- V1__init_auth_schema.sql
 -- Auth service owns the `auth` schema exclusively.
-
+--
+-- uuid_generate_v4() is schema-qualified as public.uuid_generate_v4() because
+-- this service's JDBC URL sets ?currentSchema=auth, which REPLACES the
+-- connection's search_path rather than prepending to it. CREATE EXTENSION
+-- installs uuid-ossp's functions into `public` by default, so an unqualified
+-- call is invisible on this connection even though the function objectively
+-- exists in the database — hence explicit qualification everywhere it's used.
 CREATE TABLE IF NOT EXISTS auth.users (
-    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id              UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     email           VARCHAR(255) NOT NULL,
     password_hash   VARCHAR(255) NOT NULL,
     full_name       VARCHAR(150) NOT NULL,
@@ -13,11 +19,10 @@ CREATE TABLE IF NOT EXISTS auth.users (
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT uq_users_email UNIQUE (email)
 );
-
 CREATE INDEX IF NOT EXISTS idx_users_role ON auth.users (role);
 
 CREATE TABLE IF NOT EXISTS auth.refresh_tokens (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id          UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     user_id     UUID NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
     token_hash  VARCHAR(255) NOT NULL,
     expires_at  TIMESTAMPTZ NOT NULL,
@@ -25,6 +30,5 @@ CREATE TABLE IF NOT EXISTS auth.refresh_tokens (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_refresh_tokens_hash UNIQUE (token_hash)
 );
-
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON auth.refresh_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON auth.refresh_tokens (expires_at);

@@ -62,26 +62,32 @@ public class ShowService {
             }
         }
 
-        Show show = Show.builder()
+        Show newShow = Show.builder()
                 .eventId(eventId)
                 .venueId(venue.getId())
                 .showDateTime(request.showDateTime())
                 .status(ShowStatus.SCHEDULED)
                 .build();
-        show = showRepository.save(show);
+        // Never reassign the original reference — `savedShow` is a fresh,
+        // effectively-final binding, so it stays safe to capture in any lambda
+        // added here later (this is what tripped the compiler originally:
+        // reassigning `show = showRepository.save(show)` makes `show` mutable
+        // for the rest of the method, and javac forbids capturing a mutable
+        // local in a lambda even in a method that doesn't currently use one).
+        final Show savedShow = showRepository.save(newShow);
 
         List<ShowPricing> pricingRows = request.pricing().stream()
                 .map(cp -> ShowPricing.builder()
-                        .showId(show.getId())
+                        .showId(savedShow.getId())
                         .categoryId(cp.categoryId())
                         .price(cp.price())
                         .build())
                 .toList();
         showPricingRepository.saveAll(pricingRows);
 
-        searchSyncService.indexShow(show, event, venue);
+        searchSyncService.indexShow(savedShow, event, venue);
 
-        return toResponse(show, venueCategories);
+        return toResponse(savedShow, venueCategories);
     }
 
     @Transactional(readOnly = true)
@@ -112,11 +118,13 @@ public class ShowService {
         eventService.assertOwner(event, organiserId);
 
         show.setStatus(ShowStatus.CANCELLED);
-        showRepository.save(show);
+        // Same pattern as createShow: bind the saved result to a new,
+        // effectively-final variable rather than reassigning `show`.
+        final Show cancelledShow = showRepository.save(show);
 
-        Venue venue = venueRepository.findById(show.getVenueId())
-                .orElseThrow(() -> new VenueNotFoundException(show.getVenueId()));
-        searchSyncService.indexShow(show, event, venue); // re-index with CANCELLED status
+        Venue venue = venueRepository.findById(cancelledShow.getVenueId())
+                .orElseThrow(() -> new VenueNotFoundException(cancelledShow.getVenueId()));
+        searchSyncService.indexShow(cancelledShow, event, venue); // re-index with CANCELLED status
     }
 
     private Show getShowOrThrow(UUID showId) {
